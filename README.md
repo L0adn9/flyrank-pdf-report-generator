@@ -119,3 +119,15 @@ refreshes: the same request twice produces one effect and one file, and a lock m
 *simultaneous* requests can't both decide "nothing yet" and both render. In the real world the
 missing check costs money when the side effect is external — e.g. a nightly job that emails every
 customer their invoice runs twice after a crash, and everyone gets two emails (or two charges).
+
+## Extras
+
+- **Page-number footer** — Chromium's PDF header/footer templates add
+  "Bookstore report · generated <date> · Page N of M" to every page.
+- **Parameterized report** — `POST /reports` accepts `{"min_rating": 4}` (1–5, default 1); every
+  query takes it as a `?` parameter (`WHERE rating >= ?`). The once-per-day rule counts *same day
+  and same parameters* as "the same request", so a 4★+ report and a full report can both exist
+  today. Out-of-range values → `400 {"error": "min_rating: Input should be less than or equal to 5"}`.
+- **Control panel** — `GET /reports` lists every generated report with its link, newest first.
+- **Nice filenames** — downloads are named `bookstore-report-2026-11-16.pdf`
+  (or `bookstore-report-2026-11-16-4-stars-plus.pdf`) via `Content-Disposition`.

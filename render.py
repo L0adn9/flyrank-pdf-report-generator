@@ -12,7 +12,6 @@ from report_data import get_report_data
 STARS = {1: "★☆☆☆☆", 2: "★★☆☆☆", 3: "★★★☆☆", 4: "★★★★☆", 5: "★★★★★"}
 
 CSS = """
-@page { size: A4; margin: 18mm 14mm 20mm; }
 * { box-sizing: border-box; }
 body { font-family: "Helvetica Neue", Arial, sans-serif; color: #1f2937; font-size: 11px; margin: 0; }
 h1 { font-size: 22px; margin: 0 0 2px; color: #0f766e; }
@@ -34,9 +33,23 @@ thead { display: table-header-group; }
 """
 
 
-def all_books() -> list[dict]:
+FOOTER = """
+<div style="width:100%; font-size:8px; color:#6b7280; padding:0 14mm; display:flex; justify-content:space-between;
+            font-family: Helvetica, Arial, sans-serif;">
+  <span>Bookstore report · generated <span class="date"></span></span>
+  <span>Page <span class="pageNumber"></span> of <span class="totalPages"></span></span>
+</div>
+"""
+
+
+def all_books(min_rating: int = 1) -> list[dict]:
     with connect() as conn:
-        return [dict(r) for r in conn.execute("SELECT title, price, rating FROM books ORDER BY title")]
+        return [
+            dict(r)
+            for r in conn.execute(
+                "SELECT title, price, rating FROM books WHERE rating >= ? ORDER BY title", (min_rating,)
+            )
+        ]
 
 
 def build_html(data: dict, books: list[dict], today: date | None = None) -> str:
@@ -56,11 +69,13 @@ def build_html(data: dict, books: list[dict], today: date | None = None) -> str:
         f"<td class='stars'>{STARS[b['rating']]}</td></tr>"
         for i, b in enumerate(books, 1)
     )
+    min_rating = data.get("min_rating", 1)
+    scope = f" · only books rated {min_rating}★ or more" if min_rating > 1 else ""
     return f"""<!doctype html>
 <html><head><meta charset="utf-8"><title>Bookstore report {today}</title><style>{CSS}</style></head>
 <body>
   <h1>Bookstore report</h1>
-  <p class="sub">{today:%d %B %Y} · data: the first 3 catalogue pages of books.toscrape.com</p>
+  <p class="sub">{today:%d %B %Y} · data: the first 3 catalogue pages of books.toscrape.com{scope}</p>
   <div class="totals">
     <div class="card"><div class="label">Books</div><div class="value">{data['total_books']}</div></div>
     <div class="card"><div class="label">Average price</div><div class="value">£{data['average_price']:.2f}</div></div>
@@ -84,7 +99,15 @@ def render_pdf(html: str, path: Path) -> Path:
         try:
             page = browser.new_page()
             page.set_content(html, wait_until="load")
-            page.pdf(path=str(path), format="A4", print_background=True)
+            page.pdf(
+                path=str(path),
+                format="A4",
+                print_background=True,
+                margin={"top": "18mm", "bottom": "20mm", "left": "14mm", "right": "14mm"},
+                display_header_footer=True,
+                header_template="<span></span>",
+                footer_template=FOOTER,
+            )
         finally:
             browser.close()
     return path
